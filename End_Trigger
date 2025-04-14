@@ -1,0 +1,24 @@
+## 添加关卡结束触发器
+
+1. 将旗帜（Flag）拖入 Scene 的尾部 
+   此时在 `Hierarchy` 中会出现一个新的 GameObject，将其重命名为 `Flag`。
+2. 在 `Flag` 上添加组件 Box Collider 2D，并勾选其 Is Trigger 属性。
+3. 创建一个新的 C# 脚本，命名为 LevelEndTrigger，并添加以下代码：
+   ```c#
+   using UnityEngine;
+   using UnityEngine.SceneManagement;
+
+   public class LevelEndTrigger : MonoBehaviour
+   {
+       public string nextSceneName; // 要加载的下一个场景名称
+
+       private void OnTriggerEnter2D(Collider2D other)
+       {
+           if (other.CompareTag("Player"))
+           {
+               SceneManager.LoadScene(nextSceneName);
+           }
+       }
+   }
+4.将LevelEndTrigger脚本挂载到Flag GameObject上
+5. 在Flag的Inspector panel中设置nextSceneName，填写为Level_2
