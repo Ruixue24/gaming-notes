@@ -1,0 +1,193 @@
+首先制作不动的怪物
+1.创建名为Enemy1的Gameobject，添加Box Collider 2D和Rigidbody 2D(Body Type: Static)，挂一个敌人死亡脚本Enemy1.cs
+csharp:
+public class Enemy1 : MonoBehaviour
+{
+    public GameObject deathEffect; // 可选：死亡时播放的特效
+    public void Die()
+    {
+        if (deathEffect != null)
+        {
+            Instantiate(deathEffect, transform.position, Quaternion.identity);
+        }
+        Destroy(gameObject);
+    }
+}
+2.给Enemy1添加子物体HeadCheck，添加Box Collider 2D(Is Tigger) ---> 这样踩怪头部死亡，挂一个EnemyHead脚本
+csharp：
+public class EnemyHead : MonoBehaviour
+{
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        if (other.CompareTag("Player"))
+        {
+            // 让敌人死亡，调用Enemy1里面的死亡条件
+            GetComponentInParent<Enemy1>().Die();
+
+            // 玩家弹跳
+            Rigidbody2D playerRb = other.GetComponent<Rigidbody2D>();
+            if (playerRb != null)
+            {
+                playerRb.velocity = new Vector2(playerRb.velocity.x, 4f); // 弹起来
+            }
+        }
+    }
+}
+3.玩家触碰到怪物身体后死亡
+  (1)确保Enemy的Box Collider 2D没有勾选Is Tigger
+  (2)在Enemy1.cs中添加玩家碰撞
+  csharp:
+  private void OnCollisionEnter2D(Collision2D collision)
+{
+    if (collision.collider.CompareTag("Player"))
+    {
+        // 玩家不是从头部来的，而是碰到了身体 → 玩家死亡
+        collision.collider.GetComponent<PlayerHealth>()?.Die(); // 该方法调用了PlayerHealth.cs中的死亡处理方法
+    }
+}
+  (3)添加玩家死亡方法 PlayerHealth.cs-->但是目前这段代码只是玩家立刻死亡后重新开始本关
+  csharp:
+  public class PlayerHealth : MonoBehaviour
+{
+    public void Die()
+    {
+        // 你可以加死亡动画、音效、特效等等
+        Debug.Log("玩家死亡！");
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); // 重新开始本关
+    }
+}
+
+  (4)现在我要完善死亡机制，功能如下
+     第一，玩家有六条生命
+     第二，受伤后进入无敌状态
+     第三，原地受伤不重置位置
+     第四，受伤后轻微弹开
+     第五，血量为0后GameOver
+     csharp：
+     using UnityEngine;
+using System.Collections;
+
+public class PlayerHealth : MonoBehaviour
+{
+    public int maxHealth = 6;//玩家有六次生命
+    private int currentHealth;
+
+    public float invincibleDuration = 2f;
+    public float flashInterval = 0.1f;
+    private bool isInvincible = false;
+
+    private SpriteRenderer spriteRenderer;
+    private Rigidbody2D rb;
+    private Collider2D col;
+
+    void Start()
+    {
+        currentHealth = maxHealth;
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        rb = GetComponent<Rigidbody2D>();
+        col = GetComponent<Collider2D>();
+    }
+
+    public void TakeDamage()
+    {
+        if (isInvincible) return;
+
+        currentHealth--;
+
+        if (currentHealth > 0)
+        {
+            Debug.Log("受伤！当前血量：" + currentHealth);
+            StartCoroutine(InvincibilityFlash());
+        }
+        else
+        {
+            Die();
+        }
+    }
+
+    IEnumerator InvincibilityFlash()
+    {
+        isInvincible = true;
+
+        // 添加轻微击退效果（往反方向弹一下）
+        rb.velocity = new Vector2(-rb.velocity.x * 0.5f, 5f);
+
+        float timer = 0f;
+        while (timer < invincibleDuration)
+        {
+            spriteRenderer.enabled = !spriteRenderer.enabled;
+            yield return new WaitForSeconds(flashInterval);
+            timer += flashInterval;
+        }
+
+        spriteRenderer.enabled = true;
+        isInvincible = false;
+    }
+
+    public void Die()
+    {
+        Debug.Log("你死了！");
+        // TODO：这里可以播放死亡动画、重启关卡或弹出游戏结束界面
+        gameObject.SetActive(false); // 暂时直接隐藏玩家
+    }
+}
+  5.修改Enemy1.cs中的死亡处理方法，
+  private void OnCollisionEnter2D(Collision2D collision)
+{
+    if (collision.collider.CompareTag("Player"))
+    {
+        // 玩家不是从头部来的，而是碰到了身体 → 玩家死亡
+        //collision.collider.GetComponent<PlayerHealth>()?.Die(); // 该方法调用了PlayerHealth.cs中的死亡处理方法
+        collision.collider.GetComponent<PlayerHealth>()?.TakeDamage();//这样就不会让玩家立即死亡，而是根据血量减少并触发无敌时间
+    }
+}
+
+  6.然后做一个血条系统
+    首先，玩家当前血量为六个红色的🧡
+    其次，死亡一次则血量减一，红色的心变成白色
+    (1)创建UI布局
+       准备两张图，一张为红色♥，一张为白色♥ ---> 在Canvas中点Create Empty命名为HeartsContainer ---> 加一个 Horizontal Layout Group勾选Child Alignment: Middle Left；Spacing: 设置为适合的距离（如 5）；Control Child Size → 取消勾选
+       ---> 在 HeartsContainer 下添加一个 Image，把红色♥拖进去
+    (2)创建一个血量UI控制脚本HealthUI.cs，挂在HeatsContainer上
+       csharp
+using UnityEngine;
+using UnityEngine.UI;
+using System.Collections.Generic;
+
+public class HealthUI : MonoBehaviour
+{
+    public Sprite fullHeart;
+    public Sprite emptyHeart;
+
+    public GameObject heartPrefab; // Image 预制体
+    public int maxHearts = 5;
+
+    private List<Image> hearts = new List<Image>();
+
+    public void UpdateHearts(int currentHealth)
+    {
+        // 清空原有
+        foreach (Transform child in transform)
+        {
+            Destroy(child.gameObject);
+        }
+
+        hearts.Clear();
+
+        for (int i = 0; i < maxHearts; i++)
+        {
+            GameObject heart = Instantiate(heartPrefab, transform);
+            Image img = heart.GetComponent<Image>();
+
+            img.sprite = i < currentHealth ? fullHeart : emptyHeart;
+            hearts.Add(img);
+        }
+    }
+}
+
+    (3)整合到PlayerHealth.cs脚本中
+       在 PlayerHealth.cs 的开头添加：public HealthUI healthUI;
+       在 PlayerHealth.cs的Start() 中添加：healthUI.UpdateHearts(currentHealth);
+       在 PlayerHealth的TakeDamage() 和 Die() 中都加一句：healthUI.UpdateHearts(currentHealth);
+
+
