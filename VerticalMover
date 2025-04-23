@@ -28,6 +28,7 @@ This guide explains how to create a vertically moving enemy within a defined are
 - On the `Enemy` object, add the following components:
   - `Box Collider 2D`
   - A custom script: `VerticalMover.cs`
+  - Drag the 'Enemy1.cs' in Enemy object
 
 ---
 
