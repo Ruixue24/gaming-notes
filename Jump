@@ -1,0 +1,20 @@
+1.设置一个跳跃器
+把跳跃器的动图拖入Hierarchy中，命名为jump，添加Box Collider 2D，勾选Is Trigger
+为jump挂一个jump.cs
+csharp:
+public class jump : MonoBehaviour
+{
+    public float jumpForce = 10f;
+
+    private void OnTriggerEnter2D(Collider2D other)
+    {
+        if (other.CompareTag("Player"))
+        {
+            Rigidbody2D rb = other.GetComponent<Rigidbody2D>();
+            if (rb != null)
+            {
+                rb.velocity = new Vector2(rb.velocity.x, jumpForce); // 设置Y速度，弹上去
+            }
+        }
+    }
+}
