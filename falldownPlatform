@@ -1,0 +1,66 @@
+1.想要掉下平台后血条减一，玩家重生且所有场景重启
+2.这个的逻辑和碰到Obstcale的逻辑类似
+3.找到GameController.cs，添加一段代码
+csharp：
+void Update()
+{
+    // 玩家掉出平台（比如 Y 轴低于某个值）
+    if (transform.position.y < -10f) // 根据场景调整这个值
+    {
+        Die(); // 掉血 + 复活 + 闪烁
+    }
+}
+4.但是这时发现，玩家重生后，已经打败的怪物不见了，这是因为没有真正的重置游戏状态，所以我们现在要重置游戏状态
+修改GameController中的Die()方法：
+csharp：
+void Die()
+{
+    GetComponent<PlayerHealth>()?.TakeDamage();//这样玩家重生后血条也会掉
+    if (GetComponent<PlayerHealth>()?.currentHealth <= 0)//这时或许会报错，那么去PlayerHealth把currentHealth从private改为public
+    {
+        return;
+    }
+    //  完整重启场景
+    SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+}
+5.这时又出现一个问题，玩家掉下平台后重生，但是血条也跟着重生了
+这时我们应该使用静态变量保持血量
+-在PlayHealth.cs中添加
+csharp：
+public static int savedHealth = -1;
+-在PlayHealth.cs中的Start()方法中添加
+csharp：
+void Start()
+{
+    spriteRenderer = GetComponent<SpriteRenderer>();
+    rb = GetComponent<Rigidbody2D>();
+    col = GetComponent<Collider2D>();
+    if (savedHealth < 0) // 第一次进入游戏
+        currentHealth = maxHealth;
+    else
+        currentHealth = savedHealth;
+
+    healthUI.UpdateHearts(currentHealth);
+}
+-在TakeDamage()中同步保存：
+csharp：
+public void TakeDamage(bool force = false)
+{
+    if (!force && isInvincible) return;
+
+    currentHealth--;
+    savedHealth = currentHealth; // 保存血量
+
+    healthUI.UpdateHearts(currentHealth);
+    
+    if (currentHealth > 0)
+    {
+        StartCoroutine(InvincibilityFlash());
+    }
+    else
+    {
+        Die(); // GameOver
+    }
+}
+
+
