@@ -84,3 +84,6 @@ public class GameController : MonoBehaviour
         sr.color = new Color(sr.color.r, sr.color.g, sr.color.b, 1f);
     }
 }
+
+5.现在希望碰到obstacle后血条减少，在Die()方法中增加如下代码：
+GetComponent<PlayerHealth>()?.TakeDamage();
